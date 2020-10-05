@@ -1,25 +1,31 @@
+import inotify.adapters
 import requests
 import base58
 import base64
 import json
 
-"""
-    Author : Morteza Shahbazi
-    Project : Simurgh
-    Version : v0.1.0
-    Description:
-                the goal is storing ring files in kvstore.
-                first we read ring file binary content and convert it to base58.
-                then accoumplish transaction like this : 
-                            requests.get(f'http://172.17.0.2:26657/broadcast_tx_commit?tx="{k5}={v5}"')
-                after this, we get value of transaction (ring content) as base64 and decode it.
-                            requests.get(f'http://172.17.0.2:26657/abci_query?data="{k5}"')
-                finally convert base64 to base58 and save new ring file(s).
-                enjoy :)))              
+PATH = "/home/shahbazi/Desktop/notify_dir"
 
-"""
+def notify(path):
+    flag = False
+    i = inotify.adapters.Inotify()
+    i.add_watch(path)        
+    try:
+        for event in i.event_gen(yield_nones=False):
+            (_, type_names, path, filename) = event
+            # print (type_names)
+            if "IN_MODIFY" in type_names:
+                flag = True
+            if flag and "IN_CLOSE_WRITE" in type_names :
+                flag = False
+                # print(f"PATH=[{path}] FILENAME=[{filename}] EVENT_TYPES={type_names}") 
+                # print("salam :)")
+                send_transaction("account.builder","account.builder")               
+    except KeyboardInterrupt:
+        pass
+    finally:
+        i.remove_watch(path)
 
-# trx_key : arbitrary transaction key name
 def send_transaction(trx_key, ring_file):
     with open(f"/home/shahbazi/Desktop/rings/{ring_file}","rb") as file:
         s = file.read()
@@ -40,7 +46,6 @@ def get_transaction_value(trx_key, new_ring_file):
     with open(f"/home/shahbazi/Desktop/rings/{new_ring_file}","wb") as file:
         file.write(base58.b58decode(b64_bytes))
 
-if __name__ == "__main__":
-    get_transaction_value("file13","object4.ring.gz")
-    # send_transaction("file13","object.ring.gz")
 
+if __name__ == "__main__":
+    notify(PATH)
