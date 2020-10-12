@@ -1,18 +1,3 @@
-# Copyright (c) 2010-2012 OpenStack Foundation
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-# implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import array
 import six.moves.cPickle as pickle
 import json
@@ -29,11 +14,6 @@ import sys
 import zlib
 
 from six.moves import range
-
-# from swift.common.exceptions import RingLoadError
-# from swift.common.utils import hash_path, validate_configuration
-# from swift.common.ring.utils import tiers_for_dev
-
 
 def calc_replica_count(replica2part2dev_id):
     base = len(replica2part2dev_id) - 1
@@ -55,9 +35,9 @@ class RingReader(object):
         self._md5 = md5()
         self._decomp = zlib.decompressobj(32 + zlib.MAX_WBITS)
 
-    @property
-    def close(self):
-        return self.fp.close
+    # @property
+    # def close(self):
+    #     return self.fp.close
 
     def seek(self, pos, ref=0):
         if (pos, ref) != (0, 0):
@@ -85,21 +65,7 @@ class RingReader(object):
                 break
 
         result, self._buffer = self._buffer[:amount], self._buffer[amount:]
-        return result
-
-    def readline(self):
-        # apparently pickle needs this?
-        while b'\n' not in self._buffer:
-            if not self._buffer_chunk():
-                break
-
-        line, sep, self._buffer = self._buffer.partition(b'\n')
-        return line + sep
-
-    def readinto(self, buffer):
-        chunk = self.read(len(buffer))
-        buffer[:len(chunk)] = chunk
-        return len(chunk)
+        return result    
 
     @property
     def md5(self):
@@ -122,10 +88,10 @@ class RingData(object):
             if dev is not None:
                 dev.setdefault("region", 1)
 
-    @property
-    def replica_count(self):
-        """Number of replicas (full or partial) used in the ring."""
-        return calc_replica_count(self._replica2part2dev_id)
+    # @property
+    # def replica_count(self):
+    #     """Number of replicas (full or partial) used in the ring."""
+    #     return calc_replica_count(self._replica2part2dev_id)
 
     @classmethod
     def deserialize_v1(cls, gz_file, metadata_only=False):
@@ -195,54 +161,9 @@ class RingData(object):
                                  ring_data.get('version'))
         for attr in ('md5', 'size', 'raw_size'):
             setattr(ring_data, attr, getattr(gz_file, attr))
-        return ring_data
+        return ring_data 
 
-    def serialize_v1(self, file_obj):
-        # Write out new-style serialization magic and version:
-        file_obj.write(struct.pack('!4sH', b'R1NG', 1))
-        ring = self.to_dict()
-
-        # Only include next_part_power if it is set in the
-        # builder, otherwise just ignore it
-        _text = {'devs': ring['devs'], 'part_shift': ring['part_shift'],
-                 'replica_count': len(ring['replica2part2dev_id']),
-                 'byteorder': sys.byteorder}
-
-        if ring['version'] is not None:
-            _text['version'] = ring['version']
-
-        next_part_power = ring.get('next_part_power')
-        if next_part_power is not None:
-            _text['next_part_power'] = next_part_power
-
-        json_text = json.dumps(_text, sort_keys=True,
-                               ensure_ascii=True).encode('ascii')
-        json_len = len(json_text)
-        file_obj.write(struct.pack('!I', json_len))
-        file_obj.write(json_text)
-        for part2dev_id in ring['replica2part2dev_id']:
-            file_obj.write(part2dev_id.tostring())
-
-    def save(self, filename, mtime=1300507380.0):
-        """
-        Serialize this RingData instance to disk.
-
-        :param filename: File into which this instance should be serialized.
-        :param mtime: time used to override mtime for gzip, default or None
-                      if the caller wants to include time
-        """
-        # Override the timestamp so that the same ring data creates
-        # the same bytes on disk. This makes a checksum comparison a
-        # good way to see if two rings are identical.
-        tempf = NamedTemporaryFile(dir=".", prefix=filename, delete=False)
-        gz_file = GzipFile(filename, mode='wb', fileobj=tempf, mtime=mtime)
-        self.serialize_v1(gz_file)
-        gz_file.close()
-        tempf.flush()
-        os.fsync(tempf.fileno())
-        tempf.close()
-        os.chmod(tempf.name, 0o644)
-        os.rename(tempf.name, filename)
+    
 
     def to_dict(self):
         return {'devs': self.devs,
@@ -255,9 +176,9 @@ ring_dict = RingData.load("/home/shahbazi/Desktop/rings/account.ring.gz").to_dic
 
 del ring_dict["replica2part2dev_id"]
 
-print(ring_dict)
+# print(ring_dict)
 
-# print(ring_dict["devs"][0]["device"])
+print(ring_dict["devs"][0]["replication_ip"])
 
-with open("/home/shahbazi/Desktop/ring.json","w") as ring_json:
-    json.dump(ring_dict,ring_json)
+# with open("/home/shahbazi/Desktop/ring.json","w") as ring_json:
+#     json.dump(ring_dict,ring_json)
